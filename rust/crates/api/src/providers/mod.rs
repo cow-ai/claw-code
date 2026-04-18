@@ -8,6 +8,7 @@ use crate::error::ApiError;
 use crate::types::{MessageRequest, MessageResponse};
 
 pub mod anthropic;
+pub mod cowclaw_ext;
 pub mod openai_compat;
 
 #[allow(dead_code)]
@@ -464,7 +465,7 @@ pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
             max_output_tokens: 128_000,
             context_window_tokens: 200_000,
         }),
-        _ => None,
+        _ => cowclaw_ext::model_token_limit_fallback(match_key),
     }
 }
 
@@ -521,16 +522,6 @@ const FOREIGN_PROVIDER_ENV_VARS: &[(&str, &str, &str)] = &[
         "DASHSCOPE_API_KEY",
         "Alibaba DashScope",
         "prefix your model name with `qwen/` or `qwen-` (e.g. `--model qwen-plus`) so prefix routing selects the DashScope backend",
-    ),
-    (
-        "ZAI_API_KEY",
-        "ZAI",
-        "prefix your model name with `zai/` or use a bare `glm-` name (e.g. `--model zai/glm-5.1` or `--model glm-4.7`) so prefix routing selects the ZAI backend",
-    ),
-    (
-        "MINIMAX_API_KEY",
-        "MiniMax",
-        "prefix your model name with `minimax/` or use a bare `minimax-` name (e.g. `--model minimax/M2.7` or `--model minimax-m2.7`) so prefix routing selects the MiniMax backend",
     ),
 ];
 

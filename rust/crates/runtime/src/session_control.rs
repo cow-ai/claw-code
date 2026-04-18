@@ -303,7 +303,8 @@ impl SessionStore {
 /// on-disk session directory per workspace root.
 #[must_use]
 pub fn workspace_fingerprint(workspace_root: &Path) -> String {
-    let input = workspace_root.to_string_lossy();
+    let canonical = fs::canonicalize(workspace_root).unwrap_or_else(|_| workspace_root.to_path_buf());
+    let input = canonical.to_string_lossy();
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in input.as_bytes() {
         hash ^= u64::from(*byte);
