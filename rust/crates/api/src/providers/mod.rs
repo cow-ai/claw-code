@@ -8,6 +8,7 @@ use crate::error::ApiError;
 use crate::types::{MessageRequest, MessageResponse};
 
 pub mod anthropic;
+pub mod cowclaw_ext;
 pub mod openai_compat;
 
 #[allow(dead_code)]
@@ -198,7 +199,6 @@ const MODEL_REGISTRY: &[(&str, ProviderMetadata)] = &[
             auth_env: "MINIMAX_API_KEY",
             base_url_env: "MINIMAX_BASE_URL",
             default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
->>>>>>> e710afe (feat: add ZAI/MiniMax model metadata + GLM Deep Thinking auto-enable)
         },
     ),
     // MiniMax short-form aliases for use after provider-prefix stripping.
@@ -431,43 +431,13 @@ pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
             max_output_tokens: 64_000,
             context_window_tokens: 131_072,
         }),
-<<<<<<< HEAD
         // Kimi models via DashScope (Moonshot AI)
         // Source: https://platform.moonshot.cn/docs/intro
         "kimi-k2.5" | "kimi-k1.5" => Some(ModelTokenLimit {
             max_output_tokens: 16_384,
             context_window_tokens: 256_000,
-=======
-        // ZAI GLM models (200K context)
-        "glm-5.1" | "glm-5" | "glm-5-turbo" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
         }),
-        "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.6" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.5" | "glm-4.5-air" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 128_000,
-        }),
-        // MiniMax models — both full canonical ("minimax-m2.7") and short
-        // forms produced by prefix stripping ("m2.7" from "minimax/M2.7").
-        "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
-        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "minimax-m2" | "m2" => Some(ModelTokenLimit {
-            max_output_tokens: 128_000,
-            context_window_tokens: 200_000,
->>>>>>> e710afe (feat: add ZAI/MiniMax model metadata + GLM Deep Thinking auto-enable)
-        }),
-        _ => None,
+        _ => cowclaw_ext::model_token_limit_fallback(match_key),
     }
 }
 
@@ -524,16 +494,6 @@ const FOREIGN_PROVIDER_ENV_VARS: &[(&str, &str, &str)] = &[
         "DASHSCOPE_API_KEY",
         "Alibaba DashScope",
         "prefix your model name with `qwen/` or `qwen-` (e.g. `--model qwen-plus`) so prefix routing selects the DashScope backend",
-    ),
-    (
-        "ZAI_API_KEY",
-        "ZAI",
-        "prefix your model name with `zai/` or use a bare `glm-` name (e.g. `--model zai/glm-5.1` or `--model glm-4.7`) so prefix routing selects the ZAI backend",
-    ),
-    (
-        "MINIMAX_API_KEY",
-        "MiniMax",
-        "prefix your model name with `minimax/` or use a bare `minimax-` name (e.g. `--model minimax/M2.7` or `--model minimax-m2.7`) so prefix routing selects the MiniMax backend",
     ),
 ];
 

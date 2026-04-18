@@ -50,6 +50,8 @@ const MINIMAX_ENV_VARS: &[&str] = &["MINIMAX_API_KEY"];
 const XAI_MAX_REQUEST_BODY_BYTES: usize = 52_428_800; // 50MB
 const OPENAI_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB
 const DASHSCOPE_MAX_REQUEST_BODY_BYTES: usize = 6_291_456; // 6MB (observed limit in dogfood)
+const ZAI_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB (same as OpenAI compat)
+const MINIMAX_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB (same as OpenAI compat)
 
 impl OpenAiCompatConfig {
     #[must_use]
@@ -100,6 +102,7 @@ impl OpenAiCompatConfig {
             api_key_env: "ZAI_API_KEY",
             base_url_env: "ZAI_BASE_URL",
             default_base_url: DEFAULT_ZAI_BASE_URL,
+            max_request_body_bytes: ZAI_MAX_REQUEST_BODY_BYTES,
         }
     }
 
@@ -113,6 +116,7 @@ impl OpenAiCompatConfig {
             api_key_env: "MINIMAX_API_KEY",
             base_url_env: "MINIMAX_BASE_URL",
             default_base_url: DEFAULT_MINIMAX_BASE_URL,
+            max_request_body_bytes: MINIMAX_MAX_REQUEST_BODY_BYTES,
         }
     }
 
@@ -1993,7 +1997,6 @@ mod tests {
         );
     }
 
-<<<<<<< HEAD
     // ============================================================================
     // US-009: kimi model compatibility tests
     // ============================================================================
@@ -2104,7 +2107,6 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
     fn translate_message_excludes_is_error_for_kimi_models() {
         use crate::types::{InputContentBlock, InputMessage, ToolResultContentBlock};
 
@@ -2294,7 +2296,10 @@ mod tests {
         assert!(
             super::check_request_body_size(&request, OpenAiCompatConfig::dashscope()).is_err(),
             "10MB request should fail for DashScope's 6MB limit"
-=======
+        );
+    }
+
+    #[test]
     fn glm_thinking_injected_in_chat_completion_request() {
         let request = MessageRequest {
             model: "glm-5.1".to_string(),
@@ -2364,7 +2369,6 @@ mod tests {
         assert!(
             minimax_payload.get("thinking").is_none(),
             "minimax-m2.7 must NOT have thinking parameter"
->>>>>>> e710afe (feat: add ZAI/MiniMax model metadata + GLM Deep Thinking auto-enable)
         );
     }
 

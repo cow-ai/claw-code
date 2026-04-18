@@ -31,10 +31,15 @@ impl SessionStore {
     /// The on-disk layout becomes `<cwd>/.claw/sessions/<workspace_hash>/`.
     pub fn from_cwd(cwd: impl AsRef<Path>) -> Result<Self, SessionControlError> {
         let cwd = cwd.as_ref();
+        // Ensure the base directory exists before canonicalizing the path,
+        // so that symlinks in the path (e.g. /var → /private/var on macOS)
+        // are resolved consistently between in-process and child processes.
+        fs::create_dir_all(cwd)?;
+        let fp = workspace_fingerprint(cwd);
         let sessions_root = cwd
             .join(".claw")
             .join("sessions")
-            .join(workspace_fingerprint(cwd));
+            .join(&fp);
         fs::create_dir_all(&sessions_root)?;
         Ok(Self {
             sessions_root,
@@ -294,7 +299,8 @@ impl SessionStore {
 /// on-disk session directory per workspace root.
 #[must_use]
 pub fn workspace_fingerprint(workspace_root: &Path) -> String {
-    let input = workspace_root.to_string_lossy();
+    let canonical = fs::canonicalize(workspace_root).unwrap_or_else(|_| workspace_root.to_path_buf());
+    let input = canonical.to_string_lossy();
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in input.as_bytes() {
         hash ^= u64::from(*byte);
