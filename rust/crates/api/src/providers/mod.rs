@@ -8,6 +8,7 @@ use crate::error::ApiError;
 use crate::types::{MessageRequest, MessageResponse};
 
 pub mod anthropic;
+pub mod cowclaw_ext;
 pub mod openai_compat;
 
 #[allow(dead_code)]
@@ -464,7 +465,7 @@ pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
             max_output_tokens: 128_000,
             context_window_tokens: 200_000,
         }),
-        _ => None,
+        _ => cowclaw_ext::model_token_limit_fallback(match_key),
     }
 }
 
