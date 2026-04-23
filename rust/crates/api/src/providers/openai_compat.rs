@@ -19,6 +19,8 @@ use super::{preflight_message_request, Provider, ProviderFuture};
 pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_DASHSCOPE_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+pub const DEFAULT_ZAI_BASE_URL: &str = "https://api.z.ai/api/paas/v4";
+pub const DEFAULT_MINIMAX_BASE_URL: &str = "https://api.minimax.io/v1";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
 const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_secs(1);
@@ -41,11 +43,15 @@ pub struct OpenAiCompatConfig {
 const XAI_ENV_VARS: &[&str] = &["XAI_API_KEY"];
 const OPENAI_ENV_VARS: &[&str] = &["OPENAI_API_KEY"];
 const DASHSCOPE_ENV_VARS: &[&str] = &["DASHSCOPE_API_KEY"];
+const ZAI_ENV_VARS: &[&str] = &["ZAI_API_KEY"];
+const MINIMAX_ENV_VARS: &[&str] = &["MINIMAX_API_KEY"];
 
 // Provider-specific request body size limits in bytes
 const XAI_MAX_REQUEST_BODY_BYTES: usize = 52_428_800; // 50MB
 const OPENAI_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB
 const DASHSCOPE_MAX_REQUEST_BODY_BYTES: usize = 6_291_456; // 6MB (observed limit in dogfood)
+const ZAI_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB (same as OpenAI compat)
+const MINIMAX_MAX_REQUEST_BODY_BYTES: usize = 104_857_600; // 100MB (same as OpenAI compat)
 
 impl OpenAiCompatConfig {
     #[must_use]
@@ -85,12 +91,43 @@ impl OpenAiCompatConfig {
         }
     }
 
+    /// ZAI (Zhipu AI / 智谱AI) GLM family models.
+    /// Uses the OpenAI-compatible REST shape at /api/paas/v4.
+    /// Models: GLM-5.1, GLM-5, GLM-5-Turbo, GLM-4.7, GLM-4.7-FlashX,
+    /// GLM-4.7-Flash, GLM-4.6, GLM-4.5, GLM-4.5-Air.
+    #[must_use]
+    pub const fn zai() -> Self {
+        Self {
+            provider_name: "ZAI",
+            api_key_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: DEFAULT_ZAI_BASE_URL,
+            max_request_body_bytes: ZAI_MAX_REQUEST_BODY_BYTES,
+        }
+    }
+
+    /// `MiniMax` (稀宇科技) M2.x family models.
+    /// Uses the OpenAI-compatible REST shape at /v1.
+    /// Models: MiniMax-M2.7, M2.5, M2.1, highspeed variants.
+    #[must_use]
+    pub const fn minimax() -> Self {
+        Self {
+            provider_name: "MiniMax",
+            api_key_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: DEFAULT_MINIMAX_BASE_URL,
+            max_request_body_bytes: MINIMAX_MAX_REQUEST_BODY_BYTES,
+        }
+    }
+
     #[must_use]
     pub fn credential_env_vars(self) -> &'static [&'static str] {
         match self.provider_name {
             "xAI" => XAI_ENV_VARS,
             "OpenAI" => OPENAI_ENV_VARS,
             "DashScope" => DASHSCOPE_ENV_VARS,
+            "ZAI" => ZAI_ENV_VARS,
+            "MiniMax" => MINIMAX_ENV_VARS,
             _ => &[],
         }
     }
@@ -493,7 +530,7 @@ impl StreamState {
         }
 
         for choice in chunk.choices {
-            if let Some(content) = choice.delta.content.filter(|value| !value.is_empty()) {
+            if let Some(content) = choice.delta.actual_content().filter(|value| !value.is_empty()) {
                 if !self.text_started {
                     self.text_started = true;
                     events.push(StreamEvent::ContentBlockStart(ContentBlockStartEvent {
@@ -505,7 +542,7 @@ impl StreamState {
                 }
                 events.push(StreamEvent::ContentBlockDelta(ContentBlockDeltaEvent {
                     index: 0,
-                    delta: ContentBlockDelta::TextDelta { text: content },
+                    delta: ContentBlockDelta::TextDelta { text: content.to_string() },
                 }));
             }
 
@@ -689,8 +726,20 @@ struct ChatMessage {
     role: String,
     #[serde(default)]
     content: Option<String>,
+    /// Zhipu AI GLM-5.x reasoning models return content in this field.
+    #[serde(default, alias = "reasoning_content")]
+    reasoning_content: Option<String>,
     #[serde(default)]
     tool_calls: Vec<ResponseToolCall>,
+}
+
+impl ChatMessage {
+    /// Return the actual message content, preferring `reasoning_content` for GLM reasoning models.
+    fn actual_content(&self) -> Option<&str> {
+        self.reasoning_content
+            .as_deref()
+            .or(self.content.as_deref())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -735,8 +784,20 @@ struct ChunkChoice {
 struct ChunkDelta {
     #[serde(default)]
     content: Option<String>,
+    /// Zhipu AI GLM-5.x reasoning models return streaming content here.
+    #[serde(default, alias = "reasoning_content")]
+    reasoning_content: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     tool_calls: Vec<DeltaToolCall>,
+}
+
+impl ChunkDelta {
+    /// Return the actual delta content, preferring `reasoning_content` for GLM reasoning models.
+    fn actual_content(&self) -> Option<&str> {
+        self.reasoning_content
+            .as_deref()
+            .or(self.content.as_deref())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -801,7 +862,7 @@ fn strip_routing_prefix(model: &str) -> &str {
         let prefix = &model[..pos];
         // Only strip if the prefix before "/" is a known routing prefix,
         // not if "/" appears in the middle of the model name for other reasons.
-        if matches!(prefix, "openai" | "xai" | "grok" | "qwen" | "kimi") {
+        if matches!(prefix, "openai" | "xai" | "grok" | "qwen" | "kimi" | "zai" | "minimax" | "MiniMax") {
             &model[pos + 1..]
         } else {
             model
@@ -921,6 +982,22 @@ pub fn build_chat_completion_request(
     // reasoning_effort for OpenAI-compatible reasoning models (o4-mini, o3, etc.)
     if let Some(effort) = &request.reasoning_effort {
         payload["reasoning_effort"] = json!(effort);
+    }
+
+    // ZAI GLM Deep Thinking: auto-enable for GLM models.
+    // Docs recommend temperature=1.0 but do not require it -- respect user setting.
+    // GLM models accept tuning params normally even with thinking enabled,
+    // so this injection is placed AFTER the tuning params block.
+    {
+        let canonical = super::resolve_model_alias(&request.model);
+        let canonical_lower = canonical.to_ascii_lowercase();
+        let bare = canonical_lower
+            .rsplit('/')
+            .next()
+            .unwrap_or(&canonical_lower);
+        if bare.starts_with("glm-") {
+            payload["thinking"] = json!({"type": "enabled"});
+        }
     }
 
     payload
@@ -1182,8 +1259,8 @@ fn normalize_response(
             "chat completion response missing choices",
         ))?;
     let mut content = Vec::new();
-    if let Some(text) = choice.message.content.filter(|value| !value.is_empty()) {
-        content.push(OutputContentBlock::Text { text });
+    if let Some(text) = choice.message.actual_content().filter(|value| !value.is_empty()) {
+        content.push(OutputContentBlock::Text { text: text.to_string() });
     }
     for tool_call in choice.message.tool_calls {
         content.push(OutputContentBlock::ToolUse {
@@ -1998,6 +2075,35 @@ mod tests {
             translated3[0].get("is_error").is_some(),
             "claude should include is_error field"
         );
+        assert_eq!(translated3[0]["is_error"], json!(true));
+    }
+
+    // ── ZAI GLM thinking injection tests ──
+
+    #[test]
+    fn glm_models_are_not_reasoning_models() {
+        // GLM models accept tuning params normally. Deep Thinking is opt-in
+        // via the `thinking` parameter we inject, not a permanent reasoning mode.
+        assert!(
+            !is_reasoning_model("glm-5.1"),
+            "glm-5.1 must NOT be classified as a reasoning model"
+        );
+        assert!(
+            !is_reasoning_model("glm-5"),
+            "glm-5 must NOT be classified as a reasoning model"
+        );
+        assert!(
+            !is_reasoning_model("glm-4.7"),
+            "glm-4.7 must NOT be classified as a reasoning model"
+        );
+        assert!(
+            !is_reasoning_model("glm-4.5-air"),
+            "glm-4.5-air must NOT be classified as a reasoning model"
+        );
+        assert!(
+            !is_reasoning_model("glm-4.6"),
+            "glm-4.6 must NOT be classified as a reasoning model"
+        );
     }
 
     #[test]
@@ -2194,6 +2300,79 @@ mod tests {
     }
 
     #[test]
+    fn glm_thinking_injected_in_chat_completion_request() {
+        let request = MessageRequest {
+            model: "glm-5.1".to_string(),
+            max_tokens: 4096,
+            messages: vec![InputMessage::user_text("hello")],
+            stream: false,
+            ..Default::default()
+        };
+        let payload = build_chat_completion_request(&request, OpenAiCompatConfig::zai());
+        assert_eq!(
+            payload["thinking"],
+            json!({"type": "enabled"}),
+            "GLM models must have thinking.type enabled"
+        );
+    }
+
+    #[test]
+    fn glm_thinking_preserves_user_temperature_and_top_p() {
+        // GLM models accept tuning params even with thinking enabled.
+        // The thinking injection must NOT strip user-set temperature/top_p.
+        let request = MessageRequest {
+            model: "glm-5.1".to_string(),
+            max_tokens: 4096,
+            messages: vec![InputMessage::user_text("hello")],
+            stream: false,
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            ..Default::default()
+        };
+        let payload = build_chat_completion_request(&request, OpenAiCompatConfig::zai());
+        assert_eq!(payload["thinking"], json!({"type": "enabled"}));
+        assert_eq!(
+            payload["temperature"], 0.7,
+            "GLM thinking must preserve user-set temperature"
+        );
+        assert_eq!(
+            payload["top_p"], 0.9,
+            "GLM thinking must preserve user-set top_p"
+        );
+    }
+
+    #[test]
+    fn non_glm_models_do_not_get_thinking_parameter() {
+        // Non-GLM models (gpt-4o, minimax-m2.7) must NOT have thinking injected.
+        let gpt_request = MessageRequest {
+            model: "gpt-4o".to_string(),
+            max_tokens: 512,
+            messages: vec![InputMessage::user_text("hello")],
+            stream: false,
+            ..Default::default()
+        };
+        let gpt_payload = build_chat_completion_request(&gpt_request, OpenAiCompatConfig::openai());
+        assert!(
+            gpt_payload.get("thinking").is_none(),
+            "gpt-4o must NOT have thinking parameter"
+        );
+
+        let minimax_request = MessageRequest {
+            model: "minimax-m2.7".to_string(),
+            max_tokens: 4096,
+            messages: vec![InputMessage::user_text("hello")],
+            stream: false,
+            ..Default::default()
+        };
+        let minimax_payload =
+            build_chat_completion_request(&minimax_request, OpenAiCompatConfig::minimax());
+        assert!(
+            minimax_payload.get("thinking").is_none(),
+            "minimax-m2.7 must NOT have thinking parameter"
+        );
+    }
+
+    #[test]
     fn provider_specific_size_limits_are_correct() {
         assert_eq!(OpenAiCompatConfig::dashscope().max_request_body_bytes, 6_291_456); // 6MB
         assert_eq!(OpenAiCompatConfig::openai().max_request_body_bytes, 104_857_600); // 100MB
@@ -2206,5 +2385,23 @@ mod tests {
         assert_eq!(super::strip_routing_prefix("kimi/kimi-k2.5"), "kimi-k2.5");
         assert_eq!(super::strip_routing_prefix("kimi-k2.5"), "kimi-k2.5"); // no prefix, unchanged
         assert_eq!(super::strip_routing_prefix("kimi/kimi-k1.5"), "kimi-k1.5");
+    }
+
+    #[test]
+    fn glm_alias_also_gets_thinking_injection() {
+        // resolve_model_alias("glm") -> "glm-5.1", which starts with "glm-"
+        let request = MessageRequest {
+            model: "glm".to_string(),
+            max_tokens: 4096,
+            messages: vec![InputMessage::user_text("hello")],
+            stream: false,
+            ..Default::default()
+        };
+        let payload = build_chat_completion_request(&request, OpenAiCompatConfig::zai());
+        assert_eq!(
+            payload["thinking"],
+            json!({"type": "enabled"}),
+            "GLM alias must also get thinking injection"
+        );
     }
 }

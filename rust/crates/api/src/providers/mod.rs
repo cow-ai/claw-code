@@ -8,6 +8,7 @@ use crate::error::ApiError;
 use crate::types::{MessageRequest, MessageResponse};
 
 pub mod anthropic;
+pub mod cowclaw_ext;
 pub mod openai_compat;
 
 #[allow(dead_code)]
@@ -131,6 +132,104 @@ const MODEL_REGISTRY: &[(&str, ProviderMetadata)] = &[
             default_base_url: openai_compat::DEFAULT_DASHSCOPE_BASE_URL,
         },
     ),
+    // ZAI (Zhipu AI) GLM family convenience aliases.
+    // These allow resolve_model_alias("glm") -> "glm-5.1" etc.
+    // All route through the OpenAI-compat client to ZAI's endpoint.
+    (
+        "glm",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_ZAI_BASE_URL,
+        },
+    ),
+    (
+        "glm5",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_ZAI_BASE_URL,
+        },
+    ),
+    (
+        "glm4",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_ZAI_BASE_URL,
+        },
+    ),
+    (
+        "glm4-flash",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_ZAI_BASE_URL,
+        },
+    ),
+    // MiniMax M2.x family convenience aliases.
+    // These allow resolve_model_alias("minimax") -> "minimax-m2.7" etc.
+    // All route through the OpenAI-compat client to MiniMax's endpoint.
+    (
+        "minimax",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
+    (
+        "minimax-fast",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
+    (
+        "m2",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
+    // MiniMax short-form aliases for use after provider-prefix stripping.
+    // "minimax/M2.7" strips to "M2.7" → alias "m2.7" → "minimax-m2.7".
+    (
+        "m2.7",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
+    (
+        "m2.7-highspeed",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
+    (
+        "m2.5",
+        ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        },
+    ),
 ];
 
 #[must_use]
@@ -155,6 +254,13 @@ pub fn resolve_model_alias(model: &str) -> String {
                 },
                 ProviderKind::OpenAi => match *alias {
                     "kimi" => "kimi-k2.5",
+                    "glm" => "glm-5.1",
+                    "glm5" => "glm-5",
+                    "glm4" => "glm-4.7",
+                    "glm4-flash" => "glm-4.7-flash",
+                    "minimax" => "minimax-m2.7",
+                    "minimax-fast" => "minimax-m2.7-highspeed",
+                    "m2" => "minimax-m2",
                     _ => trimmed,
                 },
             })
@@ -216,6 +322,29 @@ pub fn metadata_for_model(model: &str) -> Option<ProviderMetadata> {
             default_base_url: openai_compat::DEFAULT_DASHSCOPE_BASE_URL,
         });
     }
+    // ZAI (Zhipu AI) GLM family models. Routes zai/* and bare glm-*
+    // model names (glm-5.1, glm-4.7, glm-4.5-air, etc.) to the
+    // OpenAI-compat client pointed at ZAI's /api/paas/v4 endpoint.
+    let lower = canonical.to_ascii_lowercase();
+    if lower.starts_with("zai/") || lower.starts_with("glm-") {
+        return Some(ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "ZAI_API_KEY",
+            base_url_env: "ZAI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_ZAI_BASE_URL,
+        });
+    }
+    // MiniMax M2.x family models. Routes minimax/* and bare MiniMax-*
+    // model names (MiniMax-M2.7, MiniMax-M2.5, etc.) to the
+    // OpenAI-compat client pointed at MiniMax's /v1 endpoint.
+    if lower.starts_with("minimax/") || lower.starts_with("minimax-") {
+        return Some(ProviderMetadata {
+            provider: ProviderKind::OpenAi,
+            auth_env: "MINIMAX_API_KEY",
+            base_url_env: "MINIMAX_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_MINIMAX_BASE_URL,
+        });
+    }
     None
 }
 
@@ -273,10 +402,23 @@ pub fn max_tokens_for_model_with_override(model: &str, plugin_override: Option<u
     plugin_override.unwrap_or_else(|| max_tokens_for_model(model))
 }
 
+/// Provider routing prefixes stripped by [`model_token_limit`] before matching
+/// against the token-limit table. Users type `"zai/glm-5.1"` or
+/// `"minimax/M2.7"`; the prefix selects the provider (handled by
+/// [`metadata_for_model`]) while the remainder identifies the model.
+const TOKEN_LIMIT_PREFIXES: &[&str] = &["zai/", "minimax/", "openai/", "qwen/"];
+
 #[must_use]
 pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
     let canonical = resolve_model_alias(model);
-    match canonical.as_str() {
+    // Normalize: lowercase and strip provider routing prefixes so that
+    // "zai/glm-5.1" and "minimax/M2.7" match their token-limit entries.
+    let lower = canonical.to_ascii_lowercase();
+    let match_key = TOKEN_LIMIT_PREFIXES
+        .iter()
+        .find_map(|prefix| lower.strip_prefix(prefix))
+        .unwrap_or(&lower);
+    match match_key {
         "claude-opus-4-6" => Some(ModelTokenLimit {
             max_output_tokens: 32_000,
             context_window_tokens: 200_000,
@@ -295,7 +437,24 @@ pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
             max_output_tokens: 16_384,
             context_window_tokens: 256_000,
         }),
-        _ => None,
+        // ZAI GLM 200K + MiniMax 200K — identical limits; share one arm
+        "glm-5.1" | "glm-5" | "glm-5-turbo"
+        | "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash"
+        | "glm-4.6"
+        | "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
+        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
+            max_output_tokens: 16_384,
+            context_window_tokens: 200_000,
+        }),
+        "glm-4.5" | "glm-4.5-air" => Some(ModelTokenLimit {
+            max_output_tokens: 16_384,
+            context_window_tokens: 128_000,
+        }),
+        "minimax-m2" | "m2" => Some(ModelTokenLimit {
+            max_output_tokens: 128_000,
+            context_window_tokens: 200_000,
+        }),
+        _ => cowclaw_ext::model_token_limit_fallback(match_key),
     }
 }
 
@@ -1141,4 +1300,200 @@ NO_EQUALS_LINE
     // (env_lock only protects within a single binary). The detection logic
     // is covered: OPENAI_BASE_URL alone routes to OpenAi as a last-resort
     // fallback in detect_provider_kind().
+
+    // ── ZAI GLM model metadata tests ──
+
+    #[test]
+    fn glm_models_have_context_window_metadata() {
+        let glm51 = model_token_limit("glm-5.1").expect("glm-5.1 should be registered");
+        assert_eq!(glm51.max_output_tokens, 16_384);
+        assert_eq!(glm51.context_window_tokens, 200_000);
+
+        let glm5 = model_token_limit("glm-5").expect("glm-5 should be registered");
+        assert_eq!(glm5.max_output_tokens, 16_384);
+        assert_eq!(glm5.context_window_tokens, 200_000);
+
+        let glm47flash =
+            model_token_limit("glm-4.7-flash").expect("glm-4.7-flash should be registered");
+        assert_eq!(glm47flash.max_output_tokens, 16_384);
+        assert_eq!(glm47flash.context_window_tokens, 200_000);
+
+        let glm_4_5 = model_token_limit("glm-4.5").expect("glm-4.5 should be registered");
+        assert_eq!(glm_4_5.max_output_tokens, 16_384);
+        assert_eq!(glm_4_5.context_window_tokens, 128_000);
+
+        let glm_4_5_air = model_token_limit("glm-4.5-air").expect("glm-4.5-air should be registered");
+        assert_eq!(glm_4_5_air.max_output_tokens, 16_384);
+        assert_eq!(glm_4_5_air.context_window_tokens, 128_000);
+    }
+
+    #[test]
+    fn minimax_models_have_context_window_metadata() {
+        let m27 = model_token_limit("minimax-m2.7").expect("minimax-m2.7 should be registered");
+        assert_eq!(m27.max_output_tokens, 16_384);
+        assert_eq!(m27.context_window_tokens, 200_000);
+
+        let m2 = model_token_limit("minimax-m2").expect("minimax-m2 should be registered");
+        assert_eq!(m2.max_output_tokens, 128_000);
+        assert_eq!(m2.context_window_tokens, 200_000);
+    }
+
+    #[test]
+    fn glm_aliases_resolve_correctly() {
+        assert_eq!(resolve_model_alias("glm"), "glm-5.1");
+        assert_eq!(resolve_model_alias("glm5"), "glm-5");
+        assert_eq!(resolve_model_alias("glm4"), "glm-4.7");
+        assert_eq!(resolve_model_alias("glm4-flash"), "glm-4.7-flash");
+    }
+
+    #[test]
+    fn minimax_aliases_resolve_correctly() {
+        assert_eq!(resolve_model_alias("minimax"), "minimax-m2.7");
+        assert_eq!(
+            resolve_model_alias("minimax-fast"),
+            "minimax-m2.7-highspeed"
+        );
+        assert_eq!(resolve_model_alias("m2"), "minimax-m2");
+    }
+
+    #[test]
+    fn preflight_blocks_glm_oversized_request() {
+        let request = MessageRequest {
+            model: "glm-5.1".to_string(),
+            max_tokens: 16_384,
+            messages: vec![InputMessage {
+                role: "user".to_string(),
+                content: vec![InputContentBlock::Text {
+                    text: "x".repeat(800_000),
+                }],
+            }],
+            system: None,
+            tools: None,
+            tool_choice: None,
+            stream: false,
+            ..Default::default()
+        };
+
+        let error = preflight_message_request(&request)
+            .expect_err("oversized GLM request should be rejected");
+        match error {
+            ApiError::ContextWindowExceeded {
+                model,
+                context_window_tokens,
+                ..
+            } => {
+                assert_eq!(model, "glm-5.1");
+                assert_eq!(context_window_tokens, 200_000);
+            }
+            other => panic!("expected ContextWindowExceeded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn preflight_blocks_minimax_oversized_request() {
+        let request = MessageRequest {
+            model: "minimax-m2.7".to_string(),
+            max_tokens: 16_384,
+            messages: vec![InputMessage {
+                role: "user".to_string(),
+                content: vec![InputContentBlock::Text {
+                    text: "x".repeat(800_000),
+                }],
+            }],
+            system: None,
+            tools: None,
+            tool_choice: None,
+            stream: false,
+            ..Default::default()
+        };
+
+        let error = preflight_message_request(&request)
+            .expect_err("oversized MiniMax request should be rejected");
+        match error {
+            ApiError::ContextWindowExceeded {
+                model,
+                context_window_tokens,
+                ..
+            } => {
+                assert_eq!(model, "minimax-m2.7");
+                assert_eq!(context_window_tokens, 200_000);
+            }
+            other => panic!("expected ContextWindowExceeded, got {other:?}"),
+        }
+    }
+
+    // ── Provider prefix stripping tests (C3) ──
+
+    #[test]
+    fn model_token_limit_strips_zai_prefix() {
+        let limit = model_token_limit("zai/glm-5.1")
+            .expect("zai/glm-5.1 should match token limit");
+        assert_eq!(limit.max_output_tokens, 16_384);
+        assert_eq!(limit.context_window_tokens, 200_000);
+
+        let limit2 = model_token_limit("zai/glm-4.7")
+            .expect("zai/glm-4.7 should match token limit");
+        assert_eq!(limit2.max_output_tokens, 16_384);
+
+        let limit3 = model_token_limit("zai/glm-4.7-flash")
+            .expect("zai/glm-4.7-flash should match token limit");
+        assert_eq!(limit3.max_output_tokens, 16_384);
+
+        // Case-insensitive prefix
+        let limit4 = model_token_limit("ZAI/GLM-5.1")
+            .expect("ZAI/GLM-5.1 should match token limit");
+        assert_eq!(limit4.max_output_tokens, 16_384);
+    }
+
+    #[test]
+    fn model_token_limit_strips_minimax_prefix() {
+        let limit = model_token_limit("minimax/M2.7")
+            .expect("minimax/M2.7 should match token limit");
+        assert_eq!(limit.max_output_tokens, 16_384);
+        assert_eq!(limit.context_window_tokens, 200_000);
+
+        let limit2 = model_token_limit("minimax/M2.7-highspeed")
+            .expect("minimax/M2.7-highspeed should match token limit");
+        assert_eq!(limit2.max_output_tokens, 16_384);
+
+        let limit3 = model_token_limit("minimax/M2.5")
+            .expect("minimax/M2.5 should match token limit");
+        assert_eq!(limit3.max_output_tokens, 16_384);
+
+        // Case-insensitive prefix
+        let limit4 = model_token_limit("MINIMAX/M2.7")
+            .expect("MINIMAX/M2.7 should match token limit");
+        assert_eq!(limit4.max_output_tokens, 16_384);
+    }
+
+    #[test]
+    fn model_token_limit_strips_openai_and_qwen_prefixes() {
+        // These don't have token limits registered, so they should return None
+        // — but the stripping logic must not panic.
+        assert!(model_token_limit("openai/gpt-4.1-mini").is_none());
+        assert!(model_token_limit("qwen/qwen-plus").is_none());
+    }
+
+    #[test]
+    fn prefixed_model_names_still_route_correctly() {
+        assert_eq!(
+            detect_provider_kind("zai/glm-5.1"),
+            ProviderKind::OpenAi,
+            "zai/ prefix must route to OpenAI-compat (ZAI endpoint)"
+        );
+        assert_eq!(
+            detect_provider_kind("minimax/M2.7"),
+            ProviderKind::OpenAi,
+            "minimax/ prefix must route to OpenAI-compat (MiniMax endpoint)"
+        );
+    }
+
+    #[test]
+    fn bare_model_names_unchanged_in_token_limits() {
+        // Existing bare-name resolution must still work.
+        assert!(model_token_limit("glm-5.1").is_some());
+        assert!(model_token_limit("minimax-m2.7").is_some());
+        assert!(model_token_limit("glm").is_some());
+        assert!(model_token_limit("minimax").is_some());
+    }
 }
