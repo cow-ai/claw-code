@@ -9,4 +9,8 @@ archive/
 .claw/settings.local.json
 .claw/sessions/
 .clawhip/
+rust/.claw/sessions/
 status-help.txt
+
+# Secrets
+.env
