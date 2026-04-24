@@ -1,0 +1,3 @@
+#!/bin/sh
+# Mock claude binary for tests
+echo "mocked-opus-answer: $@"
