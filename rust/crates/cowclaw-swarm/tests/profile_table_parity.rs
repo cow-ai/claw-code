@@ -15,7 +15,7 @@ fn swarm_toml_profile_count_matches_spec() {
     let val: toml::Value = toml::from_str(&raw).unwrap();
     // Count profiles in [orchestration.profiles]
     if let Some(profiles) = val.get("orchestration").and_then(|o| o.get("profiles")) {
-        let count = profiles.as_table().map(|t| t.len()).unwrap_or(0);
+        let count = profiles.as_table().map_or(0, toml::map::Map::len);
         assert_eq!(count, 9, "expected 9 profiles (P1..P9), found {count}");
     }
     // If no orchestration section yet, test passes trivially

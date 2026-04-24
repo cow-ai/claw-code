@@ -58,7 +58,7 @@ fn rule_b_generates_skill_from_frequent_sequence() {
     assert_eq!(count, 1);
 
     // Verify SKILL.md was created
-    let skill_file = skills_dir.join(format!("auto-{}/SKILL.md", fp));
+    let skill_file = skills_dir.join(format!("auto-{fp}/SKILL.md"));
     assert!(skill_file.exists(), "SKILL.md should be generated");
     let content = std::fs::read_to_string(&skill_file).unwrap();
     assert!(content.contains("cargo test"));
@@ -86,7 +86,7 @@ fn rule_c_extracts_preferences_to_habits() {
 
     let client = MemPalaceClient::new(Box::new(MockTransport::new()));
     let count = RuleC::run(&conn, &client).unwrap();
-    assert!(count >= 0); // may find 0 if no strong preference markers found
+    let _ = count; // may be 0 if no strong preference markers found
 }
 
 #[test]

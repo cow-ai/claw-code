@@ -1,6 +1,7 @@
 use crate::planner::profile::ProfileId;
 use globset::{Glob, GlobSetBuilder};
 
+#[must_use]
 pub fn apply_force_escalate(
     profile: ProfileId,
     files: &[&str],

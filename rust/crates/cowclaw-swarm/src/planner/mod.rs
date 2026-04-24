@@ -44,7 +44,7 @@ pub fn decompose(objective: &str, profile: ProfileId, root: &Path) -> crate::Res
         id: phase_id.clone(),
         profile,
         waves: vec![WaveNode {
-            id: format!("{}/{}", phase_id, wave_id),
+            id: format!("{phase_id}/{wave_id}"),
             plans,
         }],
     };

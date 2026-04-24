@@ -1,10 +1,11 @@
+pub mod oracle_consult;
 pub mod plan_adversarial;
 pub mod scope_reduction;
 pub mod security;
-pub mod oracle_consult;
 
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GateVerdict {
@@ -14,7 +15,9 @@ pub enum GateVerdict {
 }
 
 impl GateVerdict {
+    #[must_use]
     pub fn is_fail(&self) -> bool { matches!(self, GateVerdict::Fail { .. }) }
+    #[must_use]
     pub fn findings(&self) -> Option<&str> {
         match self {
             GateVerdict::Warn { findings } | GateVerdict::Fail { findings } => Some(findings),
@@ -36,6 +39,7 @@ pub struct ChainResult {
 }
 
 impl ChainResult {
+    #[must_use]
     pub fn passed(&self) -> bool { self.blocked_by.is_none() }
 }
 
@@ -51,12 +55,15 @@ pub struct MockGate {
 }
 
 impl MockGate {
+    #[must_use]
     pub fn pass(name: &str) -> Self {
         Self { name: name.to_string(), verdict: GateVerdict::Pass }
     }
+    #[must_use]
     pub fn fail(name: &str, findings: &str) -> Self {
         Self { name: name.to_string(), verdict: GateVerdict::Fail { findings: findings.to_string() } }
     }
+    #[must_use]
     pub fn warn(name: &str, findings: &str) -> Self {
         Self { name: name.to_string(), verdict: GateVerdict::Warn { findings: findings.to_string() } }
     }
@@ -75,6 +82,7 @@ pub struct GateChain {
 }
 
 impl GateChain {
+    #[must_use]
     pub fn new(gates: Vec<Box<dyn Gate>>) -> Self { Self { gates } }
 
     pub async fn run(&self, plan_id: &str) -> crate::Result<ChainResult> {
@@ -87,7 +95,7 @@ impl GateChain {
             verdicts.push(GateResult { gate_name: name.clone(), verdict });
             if is_fail {
                 blocked_by = Some(name);
-                break; // stop on first fail
+                break;
             }
         }
         Ok(ChainResult { verdicts, blocked_by })
@@ -97,15 +105,13 @@ impl GateChain {
         &self, plan_id: &str, session_id: &str,
         ew: &mut crate::events::writer::EventWriter,
     ) -> crate::Result<ChainResult> {
+        use crate::events::{Event, Kind};
         let mut verdicts = Vec::new();
         let mut blocked_by = None;
         for gate in &self.gates {
             let verdict = gate.run(plan_id).await?;
             let is_fail = verdict.is_fail();
             let name = gate.name().to_string();
-            // Emit GateRun event
-            use crate::events::{Event, Kind};
-            use chrono::Utc;
             ew.append(&Event {
                 id: None, session_id: session_id.to_string(),
                 phase_id: None, plan_id: Some(plan_id.to_string()),
@@ -113,7 +119,7 @@ impl GateChain {
                 kind: Kind::GateRun,
                 payload: serde_json::json!({
                     "gate": name,
-                    "verdict": format!("{:?}", verdict),
+                    "verdict": format!("{verdict:?}"),
                 }),
             }).map_err(crate::Error::Sql)?;
             verdicts.push(GateResult { gate_name: name.clone(), verdict });

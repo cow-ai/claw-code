@@ -29,7 +29,7 @@ impl RuleB {
 
         let mut count = 0;
         for (fp, canonical) in rows {
-            let name = format!("auto-{}", fp);
+            let name = format!("auto-{fp}");
             let first_line = canonical.lines().next().unwrap_or("").trim().to_string();
             let content = TEMPLATE
                 .replace("{name}", &name)
@@ -48,9 +48,9 @@ impl RuleB {
                 continue;
             }
 
-            let skill_dir = skills_dir.join(&name);
-            std::fs::create_dir_all(&skill_dir)?;
-            std::fs::write(skill_dir.join("SKILL.md"), &content)?;
+            let out_dir = skills_dir.join(&name);
+            std::fs::create_dir_all(&out_dir)?;
+            std::fs::write(out_dir.join("SKILL.md"), &content)?;
             count += 1;
         }
         Ok(count)

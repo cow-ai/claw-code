@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const CREATE_SQL: &str = r#"
+pub const CREATE_SQL: &str = r"
 PRAGMA journal_mode=WAL;
 PRAGMA busy_timeout=5000;
 
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS gate_results (
   findings TEXT NOT NULL,
   ts       TEXT NOT NULL
 );
-"#;
+";
 
 pub fn apply(conn: &mut Connection) -> rusqlite::Result<()> {
     conn.execute_batch(CREATE_SQL)?;

@@ -437,29 +437,18 @@ pub fn model_token_limit(model: &str) -> Option<ModelTokenLimit> {
             max_output_tokens: 16_384,
             context_window_tokens: 256_000,
         }),
-        // ZAI GLM models (200K context)
-        "glm-5.1" | "glm-5" | "glm-5-turbo" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.6" => Some(ModelTokenLimit {
+        // ZAI GLM 200K + MiniMax 200K — identical limits; share one arm
+        "glm-5.1" | "glm-5" | "glm-5-turbo"
+        | "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash"
+        | "glm-4.6"
+        | "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
+        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
             max_output_tokens: 16_384,
             context_window_tokens: 200_000,
         }),
         "glm-4.5" | "glm-4.5-air" => Some(ModelTokenLimit {
             max_output_tokens: 16_384,
             context_window_tokens: 128_000,
-        }),
-        // MiniMax models — both full canonical ("minimax-m2.7") and short
-        // forms produced by prefix stripping ("m2.7" from "minimax/M2.7").
-        "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
-        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
         }),
         "minimax-m2" | "m2" => Some(ModelTokenLimit {
             max_output_tokens: 128_000,
@@ -1329,13 +1318,13 @@ NO_EQUALS_LINE
         assert_eq!(glm47flash.max_output_tokens, 16_384);
         assert_eq!(glm47flash.context_window_tokens, 200_000);
 
-        let glm45 = model_token_limit("glm-4.5").expect("glm-4.5 should be registered");
-        assert_eq!(glm45.max_output_tokens, 16_384);
-        assert_eq!(glm45.context_window_tokens, 128_000);
+        let glm_4_5 = model_token_limit("glm-4.5").expect("glm-4.5 should be registered");
+        assert_eq!(glm_4_5.max_output_tokens, 16_384);
+        assert_eq!(glm_4_5.context_window_tokens, 128_000);
 
-        let glm45air = model_token_limit("glm-4.5-air").expect("glm-4.5-air should be registered");
-        assert_eq!(glm45air.max_output_tokens, 16_384);
-        assert_eq!(glm45air.context_window_tokens, 128_000);
+        let glm_4_5_air = model_token_limit("glm-4.5-air").expect("glm-4.5-air should be registered");
+        assert_eq!(glm_4_5_air.max_output_tokens, 16_384);
+        assert_eq!(glm_4_5_air.context_window_tokens, 128_000);
     }
 
     #[test]

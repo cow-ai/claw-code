@@ -11,7 +11,7 @@ pub struct SecurityGate;
 
 #[async_trait]
 impl Gate for SecurityGate {
-    fn name(&self) -> &str { "security" }
+    fn name(&self) -> &'static str { "security" }
 
     async fn run(&self, plan_id: &str) -> crate::Result<GateVerdict> {
         // Check if plan_id or any associated files match deny patterns
@@ -19,7 +19,7 @@ impl Gate for SecurityGate {
         for pattern in DENY_PATTERNS {
             if plan_id.contains(pattern) {
                 return Ok(GateVerdict::Fail {
-                    findings: format!("plan_id contains sensitive path: {}", pattern),
+                    findings: format!("plan_id contains sensitive path: {pattern}"),
                 });
             }
         }

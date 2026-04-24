@@ -17,6 +17,8 @@ fn estimate_task_lines(task: &Task) -> usize {
     8 + (content_len / 8).max(1) // 8 wrapper lines + prose estimate
 }
 
+#[must_use]
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn size_and_split(
     phase: &str,
     wave: &str,
@@ -50,13 +52,13 @@ fn make_plan(phase: &str, wave: &str, idx: usize, tasks: Vec<Task>, lines: usize
     XmlPlan {
         id: format!("{}/{}/plan-{:02}", phase, wave, idx + 1),
         title: format!("Auto-split plan {} of {}", idx + 1, phase),
-        wave: format!("{}/{}", phase, wave),
+        wave: format!("{phase}/{wave}"),
         depends: vec![],
         files: vec![],
         skills_required: vec![],
         tasks,
         budget_tier: cfg.default_tier,
-        budget_lines: lines.min(cfg.auto_split_over) as u32,
+        budget_lines: u32::try_from(lines.min(cfg.auto_split_over)).unwrap_or(u32::MAX),
         commit_message_hint: String::new(),
     }
 }

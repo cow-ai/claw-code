@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -6,8 +6,7 @@ fn main() {
         .iter()
         .position(|a| a == "--mode")
         .and_then(|i| args.get(i + 1))
-        .map(|s| s.as_str())
-        .unwrap_or("session_end");
+        .map_or("session_end", String::as_str);
 
     let db_path = PathBuf::from(".cowclaw/swarm.db");
     let skills_dir = PathBuf::from(".cowclaw/skills");
@@ -39,7 +38,7 @@ fn main() {
     }
 }
 
-fn run_session_end(db_path: &PathBuf, skills_dir: &PathBuf) -> cowclaw_swarm::Result<()> {
+fn run_session_end(db_path: &Path, skills_dir: &Path) -> cowclaw_swarm::Result<()> {
     use cowclaw_swarm::memory::mempalace::{MemPalaceClient, MockTransport};
     use cowclaw_promoter::rules::{a_insight::RuleA, b_skill::RuleB, c_habit::RuleC};
 
@@ -62,8 +61,8 @@ fn run_session_end(db_path: &PathBuf, skills_dir: &PathBuf) -> cowclaw_swarm::Re
 }
 
 fn run_phase_end(
-    db_path: &PathBuf,
-    planning_dir: &PathBuf,
+    db_path: &Path,
+    planning_dir: &Path,
     phase_id: &str,
 ) -> cowclaw_swarm::Result<()> {
     use cowclaw_swarm::memory::mempalace::{MemPalaceClient, MockTransport};

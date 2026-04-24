@@ -17,8 +17,10 @@ impl ScratchWorktree {
         Ok(Self { repo_root: repo_root.to_path_buf(), path: scratch_dir, name })
     }
 
+    #[must_use]
     pub fn path(&self) -> &Path { &self.path }
 
+    #[must_use]
     pub fn keep(self) -> PathBuf {
         let path = self.path.clone();
         std::mem::forget(self);

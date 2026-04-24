@@ -29,6 +29,7 @@ pub struct MemPalaceClient {
 }
 
 impl MemPalaceClient {
+    #[must_use]
     pub fn new(transport: Box<dyn PalaceTransport>) -> Self { Self { transport } }
     pub fn add_drawer(&self, drawer: &Drawer) -> crate::Result<String> {
         self.transport.add_drawer(drawer)
@@ -47,6 +48,7 @@ pub struct MockTransport {
 }
 
 impl MockTransport {
+    #[must_use]
     pub fn new() -> Self { Self { drawers: std::sync::Mutex::new(HashMap::new()) } }
 }
 
@@ -81,6 +83,6 @@ impl PalaceTransport for MockTransport {
 
 fn uuid_simple() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    format!("{:x}", t)
+    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    format!("{t:x}")
 }

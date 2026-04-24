@@ -106,7 +106,7 @@ impl OpenAiCompatConfig {
         }
     }
 
-    /// MiniMax (稀宇科技) M2.x family models.
+    /// `MiniMax` (稀宇科技) M2.x family models.
     /// Uses the OpenAI-compatible REST shape at /v1.
     /// Models: MiniMax-M2.7, M2.5, M2.1, highspeed variants.
     #[must_use]
@@ -738,7 +738,7 @@ impl ChatMessage {
     fn actual_content(&self) -> Option<&str> {
         self.reasoning_content
             .as_deref()
-            .or_else(|| self.content.as_deref())
+            .or(self.content.as_deref())
     }
 }
 
@@ -796,7 +796,7 @@ impl ChunkDelta {
     fn actual_content(&self) -> Option<&str> {
         self.reasoning_content
             .as_deref()
-            .or_else(|| self.content.as_deref())
+            .or(self.content.as_deref())
     }
 }
 

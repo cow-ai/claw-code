@@ -30,7 +30,7 @@ impl EventReader {
                 Box::new(e),
             ))?;
 
-        let kind: Kind = serde_json::from_str(&format!("\"{}\"", kind_str))
+        let kind: Kind = serde_json::from_str(&format!("\"{kind_str}\""))
             .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
                 6,
                 rusqlite::types::Type::Text,
@@ -77,11 +77,12 @@ impl EventReader {
     }
 
     pub fn tail(&self, n: usize) -> rusqlite::Result<Vec<Event>> {
+        let n_i64 = i64::try_from(n).unwrap_or(i64::MAX);
         let mut stmt = self.conn.prepare(
             "SELECT id, session_id, phase_id, plan_id, worker_id, ts, kind, payload
              FROM events ORDER BY id DESC LIMIT ?1"
         )?;
-        let rows = stmt.query_map(params![n as i64], Self::row_to_event)?;
+        let rows = stmt.query_map(params![n_i64], Self::row_to_event)?;
         let mut events: Vec<Event> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
         events.reverse();
         Ok(events)
@@ -89,6 +90,6 @@ impl EventReader {
 
     pub fn count(&self) -> rusqlite::Result<usize> {
         self.conn.query_row("SELECT COUNT(*) FROM events", [], |r| r.get::<_, i64>(0))
-            .map(|n| n as usize)
+            .map(|n| usize::try_from(n).unwrap_or(0))
     }
 }

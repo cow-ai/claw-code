@@ -1,14 +1,13 @@
 use std::path::Path;
 use crate::budget::Tier;
 
+#[must_use]
 pub fn extract_tier(content: &str) -> Tier {
-    let after = match content.strip_prefix("---\n") {
-        Some(s) => s,
-        None => return Tier::Default,
+    let Some(after) = content.strip_prefix("---\n") else {
+        return Tier::Default;
     };
-    let end = match after.find("\n---\n") {
-        Some(i) => i,
-        None => return Tier::Default,
+    let Some(end) = after.find("\n---\n") else {
+        return Tier::Default;
     };
     let fm = &after[..end];
     for line in fm.lines() {

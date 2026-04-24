@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use std::fmt::Write as _;
 use std::path::Path;
 use cowclaw_swarm::memory::mempalace::{Drawer, MemPalaceClient};
 
@@ -15,7 +16,7 @@ impl RuleD {
         let mut stmt = conn.prepare(
             "SELECT gate, verdict, findings FROM gate_results WHERE plan_id LIKE ?1",
         )?;
-        let pattern = format!("{}%", phase_id);
+        let pattern = format!("{phase_id}%");
         let gate_rows: Vec<(String, String, String)> = stmt
             .query_map([&pattern], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
             .collect::<rusqlite::Result<_>>()?;
@@ -30,8 +31,7 @@ impl RuleD {
 
         // Build RETRO.md
         let mut retro = format!(
-            "---\nphase_id: {}\ngenerated_by: rule_d\n---\n# Phase Retrospective: {}\n\n",
-            phase_id, phase_id
+            "---\nphase_id: {phase_id}\ngenerated_by: rule_d\n---\n# Phase Retrospective: {phase_id}\n\n"
         );
 
         retro.push_str("## What went well\n\n");
@@ -40,7 +40,7 @@ impl RuleD {
             retro.push_str("- (no gate results recorded)\n");
         } else {
             for (gate, _, _) in &passed {
-                retro.push_str(&format!("- {} gate passed\n", gate));
+                let _ = writeln!(retro, "- {gate} gate passed");
             }
         }
 
@@ -53,7 +53,7 @@ impl RuleD {
             retro.push_str("- (no failures)\n");
         } else {
             for (gate, v, findings) in &failed {
-                retro.push_str(&format!("- {} {}: {}\n", gate, v, findings));
+                let _ = writeln!(retro, "- {gate} {v}: {findings}");
             }
         }
 
@@ -62,12 +62,9 @@ impl RuleD {
             retro.push_str("- (none)\n");
         } else {
             for (q, r, o) in &consult_rows {
-                retro.push_str(&format!(
-                    "- Q: {}\n  A: {}\n  Outcome: {}\n",
-                    q,
+                let _ = writeln!(retro, "- Q: {q}\n  A: {}\n  Outcome: {}",
                     r.as_deref().unwrap_or(""),
-                    o.as_deref().unwrap_or("")
-                ));
+                    o.as_deref().unwrap_or(""));
             }
         }
 
@@ -80,7 +77,7 @@ impl RuleD {
         // Add to MemPalace
         palace.add_drawer(&Drawer {
             wing: "cowclaw".to_string(),
-            title: format!("Retro: {}", phase_id),
+            title: format!("Retro: {phase_id}"),
             body: retro.chars().take(500).collect(),
             tags: vec!["retro".to_string(), phase_id.to_string()],
         })?;
@@ -88,6 +85,7 @@ impl RuleD {
         Ok(())
     }
 
+    #[must_use]
     pub fn retro_path(planning_dir: &Path, phase_id: &str) -> std::path::PathBuf {
         planning_dir.join(phase_id).join("RETRO.md")
     }

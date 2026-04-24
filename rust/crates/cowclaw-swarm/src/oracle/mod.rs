@@ -28,6 +28,7 @@ struct CapState {
 }
 
 impl Oracle {
+    #[must_use]
     pub fn new(cfg: OracleConfig) -> Self { Self { cfg } }
 
     pub async fn consult(&self, prompt: &str, _plan_id: &str) -> Result<String, OracleError> {

@@ -6,9 +6,11 @@ use std::collections::BTreeMap;
 pub enum ProfileId { P1, P2, P3, P4, P5, P6, P7, P8, P9 }
 
 impl ProfileId {
+    #[must_use]
     pub fn is_inline(&self) -> bool { matches!(self, ProfileId::P1 | ProfileId::P2) }
 
     /// Minimum of P6 escalation
+    #[must_use]
     pub fn escalate_to_p6(self) -> ProfileId {
         match self {
             ProfileId::P1 | ProfileId::P2 | ProfileId::P3 |
@@ -20,7 +22,7 @@ impl ProfileId {
 
 impl std::fmt::Display for ProfileId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -43,6 +45,7 @@ pub struct ProfileTable {
 }
 
 impl ProfileTable {
+    #[must_use]
     pub fn get(&self, id: ProfileId) -> Option<&Profile> {
         self.profiles.get(&id)
     }

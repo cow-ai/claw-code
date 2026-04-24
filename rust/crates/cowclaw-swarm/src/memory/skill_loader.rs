@@ -61,6 +61,7 @@ impl SkillManifest {
     }
 
     /// Scan a directory for SKILL.md files and parse them.
+    #[must_use]
     pub fn from_dir(dir: &Path) -> Vec<Self> {
         let mut results = Vec::new();
         if let Ok(entries) = std::fs::read_dir(dir) {
@@ -100,7 +101,7 @@ impl SkillRegistry {
                  VALUES (?1, ?2, ?3, ?4, 'filesystem', ?5, 'default', ?6)",
                 params![
                     m.name, m.path.to_string_lossy().as_ref(),
-                    m.description, m.trigger_hints, m.line_count as i64,
+                    m.description, m.trigger_hints, i64::try_from(m.line_count).unwrap_or(i64::MAX),
                     chrono::Utc::now().to_rfc3339(),
                 ],
             )?;

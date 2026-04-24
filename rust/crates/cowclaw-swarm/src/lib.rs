@@ -1,14 +1,15 @@
 #![allow(clippy::module_inception)]
 
+pub mod budget;
 pub mod config;
 pub mod events;
-pub mod hivemind;
-pub mod planner;
 pub mod gates;
-pub mod worker;
+pub mod hivemind;
 pub mod memory;
+pub mod mcp_stdio;
 pub mod oracle;
-pub mod budget;
+pub mod planner;
+pub mod worker;
 
 pub type Result<T> = std::result::Result<T, Error>;
 

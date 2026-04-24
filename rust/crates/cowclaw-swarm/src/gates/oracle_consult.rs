@@ -8,12 +8,13 @@ pub struct OracleConsultGate {
 }
 
 impl OracleConsultGate {
+    #[must_use]
     pub fn new(oracle: Oracle, gate_prompt: String) -> Self { Self { oracle, gate_prompt } }
 }
 
 #[async_trait]
 impl Gate for OracleConsultGate {
-    fn name(&self) -> &str { "oracle_consult" }
+    fn name(&self) -> &'static str { "oracle_consult" }
 
     async fn run(&self, plan_id: &str) -> crate::Result<GateVerdict> {
         let prompt = format!("{}\n\nPlan: {}", self.gate_prompt, plan_id);

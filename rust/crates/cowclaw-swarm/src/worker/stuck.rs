@@ -9,6 +9,7 @@ pub struct StuckDetector {
 }
 
 impl StuckDetector {
+    #[must_use]
     pub fn new(threshold: usize) -> Self {
         Self { threshold, window: VecDeque::new() }
     }
@@ -16,7 +17,7 @@ impl StuckDetector {
     pub fn observe(&mut self, err: &str) -> StuckSignal {
         let fp = Self::fingerprint(err);
         // If different from last, clear window
-        if self.window.back().map(|s| s.as_str()) != Some(fp.as_str()) {
+        if self.window.back().map(String::as_str) != Some(fp.as_str()) {
             self.window.clear();
         }
         self.window.push_back(fp.clone());

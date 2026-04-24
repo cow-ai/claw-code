@@ -36,10 +36,10 @@ impl PlanningTree {
 
             for plan in &wave.plans {
                 // plan.id is "ph1/w1/plan-01" → plan dir is last segment
-                let plan_slug = plan.id.split('/').last().unwrap_or("plan");
+                let plan_slug = plan.id.split('/').next_back().unwrap_or("plan");
                 let plan_dir = wave_dir.join(plan_slug);
                 std::fs::create_dir_all(&plan_dir)?;
-                let xml = plan.to_xml().map_err(|e| crate::Error::Other(e))?;
+                let xml = plan.to_xml().map_err(crate::Error::Other)?;
                 std::fs::write(plan_dir.join("PLAN.xml"), xml)?;
             }
         }
@@ -69,7 +69,7 @@ impl PlanningTree {
                 let wave_md = wave_path.join("WAVE.md");
                 if !wave_md.exists() { continue; }
 
-                let wave_id = format!("{}/{}", id, wave_path.file_name().unwrap().to_string_lossy());
+                let full_wave_id = format!("{}/{}", id, wave_path.file_name().unwrap().to_string_lossy());
                 let mut plans = Vec::new();
 
                 for plan_entry in std::fs::read_dir(&wave_path)? {
@@ -84,7 +84,7 @@ impl PlanningTree {
                     }
                 }
                 if !plans.is_empty() {
-                    waves.push(WaveNode { id: wave_id, plans });
+                    waves.push(WaveNode { id: full_wave_id, plans });
                 }
             }
             phases.push(PhaseNode { id, profile, waves });
@@ -100,7 +100,7 @@ fn extract_profile_from_frontmatter(content: &str) -> ProfileId {
                 if let Some(v) = line.strip_prefix("profile: ") {
                     return match v.trim() {
                         "P1" => ProfileId::P1, "P2" => ProfileId::P2,
-                        "P3" => ProfileId::P3, "P4" => ProfileId::P4,
+                        "P3" => ProfileId::P3,
                         "P5" => ProfileId::P5, "P6" => ProfileId::P6,
                         "P7" => ProfileId::P7, "P8" => ProfileId::P8,
                         "P9" => ProfileId::P9,

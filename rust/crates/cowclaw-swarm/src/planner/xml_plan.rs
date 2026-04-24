@@ -30,36 +30,37 @@ pub struct XmlPlan {
 
 impl XmlPlan {
     pub fn to_xml(&self) -> Result<String, String> {
+        use std::fmt::Write as _;
         let mut xml = String::new();
         xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        xml.push_str(&format!("<plan id=\"{}\">\n", escape_xml(&self.id)));
-        xml.push_str(&format!("  <title>{}</title>\n", escape_xml(&self.title)));
-        xml.push_str(&format!("  <wave>{}</wave>\n", escape_xml(&self.wave)));
-        xml.push_str(&format!("  <budget tier=\"{}\" lines=\"{}\"/>\n",
-            format!("{:?}", self.budget_tier).to_lowercase(), self.budget_lines));
-        xml.push_str(&format!("  <commit_message_hint>{}</commit_message_hint>\n",
-            escape_xml(&self.commit_message_hint)));
+        let _ = writeln!(xml, "<plan id=\"{}\">", escape_xml(&self.id));
+        let _ = writeln!(xml, "  <title>{}</title>", escape_xml(&self.title));
+        let _ = writeln!(xml, "  <wave>{}</wave>", escape_xml(&self.wave));
+        let _ = writeln!(xml, "  <budget tier=\"{}\" lines=\"{}\"/>",
+            format!("{:?}", self.budget_tier).to_lowercase(), self.budget_lines);
+        let _ = writeln!(xml, "  <commit_message_hint>{}</commit_message_hint>",
+            escape_xml(&self.commit_message_hint));
         if !self.depends.is_empty() {
             xml.push_str("  <depends>\n");
-            for d in &self.depends { xml.push_str(&format!("    <dep>{}</dep>\n", escape_xml(d))); }
+            for d in &self.depends { let _ = writeln!(xml, "    <dep>{}</dep>", escape_xml(d)); }
             xml.push_str("  </depends>\n");
         }
         if !self.files.is_empty() {
             xml.push_str("  <files>\n");
-            for f in &self.files { xml.push_str(&format!("    <file>{}</file>\n", escape_xml(f))); }
+            for f in &self.files { let _ = writeln!(xml, "    <file>{}</file>", escape_xml(f)); }
             xml.push_str("  </files>\n");
         }
         if !self.skills_required.is_empty() {
             xml.push_str("  <skills_required>\n");
-            for s in &self.skills_required { xml.push_str(&format!("    <skill>{}</skill>\n", escape_xml(s))); }
+            for s in &self.skills_required { let _ = writeln!(xml, "    <skill>{}</skill>", escape_xml(s)); }
             xml.push_str("  </skills_required>\n");
         }
         xml.push_str("  <tasks>\n");
         for t in &self.tasks {
-            xml.push_str(&format!("    <task id=\"{}\">\n", escape_xml(&t.id)));
-            xml.push_str(&format!("      <action>{}</action>\n", escape_xml(&t.action)));
-            xml.push_str(&format!("      <verify>{}</verify>\n", escape_xml(&t.verify)));
-            xml.push_str(&format!("      <done>{}</done>\n", escape_xml(&t.done)));
+            let _ = writeln!(xml, "    <task id=\"{}\">", escape_xml(&t.id));
+            let _ = writeln!(xml, "      <action>{}</action>", escape_xml(&t.action));
+            let _ = writeln!(xml, "      <verify>{}</verify>", escape_xml(&t.verify));
+            let _ = writeln!(xml, "      <done>{}</done>", escape_xml(&t.done));
             xml.push_str("    </task>\n");
         }
         xml.push_str("  </tasks>\n");

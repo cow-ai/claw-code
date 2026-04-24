@@ -1,6 +1,6 @@
-//! CowClaw provider extensions — isolated from upstream claw-code.
+//! `CowClaw` provider extensions — isolated from upstream claw-code.
 //!
-//! This module contains CowClaw-specific provider logic (ZAI, MiniMax)
+//! This module contains `CowClaw`-specific provider logic (ZAI, `MiniMax`)
 //! that is designed to be cleanly separable from upstream code.
 //!
 //! **Extension points:**
@@ -14,41 +14,29 @@
 
 use crate::providers::ModelTokenLimit;
 
-/// Token limits for CowClaw-specific providers (ZAI GLM, MiniMax).
+/// Token limits for `CowClaw`-specific providers (ZAI GLM, `MiniMax`).
 ///
 /// Called as the fallback arm of `model_token_limit()` so that adding new
-/// CowClaw providers never requires editing upstream's match statement.
+/// `CowClaw` providers never requires editing upstream's match statement.
 ///
 /// # Arguments
 /// * `model` — the already-lowercased, prefix-stripped model key
 ///   (e.g. `"glm-5.1"`, `"m2.7"`) as produced by `model_token_limit()`.
 pub fn model_token_limit_fallback(model: &str) -> Option<ModelTokenLimit> {
     match model {
-        // ZAI GLM models (200K context)
-        // Source: https://open.bigmodel.cn/dev/api
-        "glm-5.1" | "glm-5" | "glm-5-turbo" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
-        }),
-        "glm-4.6" => Some(ModelTokenLimit {
+        // ZAI GLM 200K + MiniMax 200K — all share identical token limits
+        // Source: https://open.bigmodel.cn/dev/api, https://platform.minimaxi.com/document/Models
+        "glm-5.1" | "glm-5" | "glm-5-turbo"
+        | "glm-4.7" | "glm-4.7-flashx" | "glm-4.7-flash"
+        | "glm-4.6"
+        | "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
+        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
             max_output_tokens: 16_384,
             context_window_tokens: 200_000,
         }),
         "glm-4.5" | "glm-4.5-air" => Some(ModelTokenLimit {
             max_output_tokens: 16_384,
             context_window_tokens: 128_000,
-        }),
-        // MiniMax models — canonical ("minimax-m2.7") and short forms
-        // produced by prefix stripping ("m2.7" from "minimax/M2.7").
-        // Source: https://platform.minimaxi.com/document/Models
-        "minimax-m2.7" | "minimax-m2.7-highspeed" | "minimax-m2.5"
-        | "m2.7" | "m2.7-highspeed" | "m2.5" => Some(ModelTokenLimit {
-            max_output_tokens: 16_384,
-            context_window_tokens: 200_000,
         }),
         "minimax-m2" | "m2" => Some(ModelTokenLimit {
             max_output_tokens: 128_000,
