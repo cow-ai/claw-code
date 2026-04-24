@@ -41,3 +41,28 @@ async fn worker_roundtrip_emits_start_end() {
     // plan_id set on both events
     assert_eq!(events[0].plan_id.as_deref(), Some("plan-smoke"));
 }
+
+#[tokio::test]
+async fn worker_stuck_emits_worker_stuck_event() {
+    let repo = TempDir::new().unwrap();
+    init_git_repo(repo.path());
+
+    let db = TempDir::new().unwrap();
+    let db_path = db.path().join("swarm.db");
+    let mut ew = EventWriter::open(&db_path).unwrap();
+
+    let worker = Worker {
+        id: "w2".into(),
+        plan_id: "plan-stuck".into(),
+        phase_id: "ph1".into(),
+        session_id: "sess2".into(),
+        runtime: MockRuntime { next_status: TurnStatus::ChunkTimeout },
+        stuck_threshold: 3,
+    };
+
+    let _out = worker.execute(repo.path(), "<tasks/>".into(), &mut ew).await.unwrap();
+    let reader = EventReader::open(&db_path).unwrap();
+    let events = reader.by_plan_id("plan-stuck").unwrap();
+    let has_stuck = events.iter().any(|e| e.kind == Kind::WorkerStuck);
+    assert!(has_stuck, "expected WorkerStuck event");
+}
