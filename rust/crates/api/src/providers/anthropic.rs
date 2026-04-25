@@ -122,6 +122,7 @@ pub struct AnthropicClient {
     session_tracer: Option<SessionTracer>,
     prompt_cache: Option<PromptCache>,
     last_prompt_cache_record: Arc<Mutex<Option<PromptCacheRecord>>>,
+    chunk_deadline: Option<Duration>,
 }
 
 impl AnthropicClient {
@@ -138,6 +139,7 @@ impl AnthropicClient {
             session_tracer: None,
             prompt_cache: None,
             last_prompt_cache_record: Arc::new(Mutex::new(None)),
+            chunk_deadline: None,
         }
     }
 
@@ -154,6 +156,7 @@ impl AnthropicClient {
             session_tracer: None,
             prompt_cache: None,
             last_prompt_cache_record: Arc::new(Mutex::new(None)),
+            chunk_deadline: None,
         }
     }
 
@@ -208,6 +211,17 @@ impl AnthropicClient {
         self.max_retries = max_retries;
         self.initial_backoff = initial_backoff;
         self.max_backoff = max_backoff;
+        self
+    }
+
+    /// Set a per-chunk read deadline for streaming responses.
+    ///
+    /// When the provider sends response headers but stalls before delivering
+    /// any SSE body bytes, `next_event()` will return `ApiError::ChunkTimeout`
+    /// after this duration instead of hanging indefinitely.
+    #[must_use]
+    pub fn with_chunk_deadline(mut self, deadline: Duration) -> Self {
+        self.chunk_deadline = Some(deadline);
         self
     }
 
@@ -355,6 +369,7 @@ impl AnthropicClient {
             latest_usage: None,
             usage_recorded: false,
             last_prompt_cache_record: Arc::clone(&self.last_prompt_cache_record),
+            chunk_deadline: self.chunk_deadline,
         })
     }
 
@@ -804,6 +819,7 @@ pub struct MessageStream {
     latest_usage: Option<Usage>,
     usage_recorded: bool,
     last_prompt_cache_record: Arc<Mutex<Option<PromptCacheRecord>>>,
+    chunk_deadline: Option<Duration>,
 }
 
 impl MessageStream {
@@ -828,9 +844,15 @@ impl MessageStream {
                 return Ok(None);
             }
 
-            match self.response.chunk().await? {
-                Some(chunk) => {
-                    self.pending.extend(self.parser.push(&chunk)?);
+            let chunk = match self.chunk_deadline {
+                Some(d) => tokio::time::timeout(d, self.response.chunk())
+                    .await
+                    .map_err(|_| ApiError::ChunkTimeout)??,
+                None => self.response.chunk().await?,
+            };
+            match chunk {
+                Some(bytes) => {
+                    self.pending.extend(self.parser.push(&bytes)?);
                 }
                 None => {
                     self.done = true;
@@ -1717,27 +1739,37 @@ mod tests {
 
     /// M14.1 — TDD: chunk_deadline fires and surfaces a typed ChunkTimeout error.
     ///
-    /// Without M14.2: `response.chunk().await` hangs indefinitely; the 5-second outer
-    /// guard fires and `.expect()` panics → test FAILS.
-    /// After M14.2: chunk_deadline (50 ms) fires; `next_event()` returns
-    /// `Err(ApiError::ChunkTimeout)` well inside the guard → test PASSES.
+    /// The stall server sends response headers then never delivers body bytes.
+    /// chunk_deadline (50 ms) must surface `ApiError::ChunkTimeout` before
+    /// the 5-second outer guard fires.
     #[tokio::test]
     async fn chunk_deadline_surfaces_typed_error() {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind stall listener");
-        let addr = listener.local_addr().expect("stall listener addr");
-        thread::spawn(move || {
-            // count_tokens preflight: quick 404 that the client silently ignores
-            if let Ok((mut s, _)) = listener.accept() {
-                let _ = s.write_all(
-                    b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-                );
+        use tokio::io::AsyncWriteExt as _;
+        use tokio::net::TcpListener as AsyncTcpListener;
+
+        // Async stall server — runs inside the same tokio runtime so timers can fire.
+        let server = AsyncTcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind stall listener");
+        let addr = server.local_addr().expect("stall listener addr");
+
+        tokio::spawn(async move {
+            // count_tokens preflight: 404 → silently ignored by the client
+            if let Ok((mut s, _)) = server.accept().await {
+                let _ = s
+                    .write_all(
+                        b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+                    )
+                    .await;
             }
-            // streaming: send 200 + headers only, then stall forever
-            if let Ok((mut s, _)) = listener.accept() {
-                let _ = s.write_all(
-                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n",
-                );
-                thread::sleep(Duration::from_secs(60));
+            // streaming: 200 + chunked headers only, then stall
+            if let Ok((mut s, _)) = server.accept().await {
+                let _ = s
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n",
+                    )
+                    .await;
+                tokio::time::sleep(Duration::from_secs(60)).await;
             }
         });
 

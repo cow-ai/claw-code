@@ -70,6 +70,9 @@ pub enum ApiError {
         max_bytes: usize,
         provider: &'static str,
     },
+    /// The provider stream stalled: no chunk was received within the configured deadline.
+    /// Signals a silent hang rather than a network or API error.
+    ChunkTimeout,
 }
 
 impl ApiError {
@@ -137,7 +140,8 @@ impl ApiError {
             | Self::Json { .. }
             | Self::InvalidSseFrame(_)
             | Self::BackoffOverflow { .. }
-            | Self::RequestBodySizeExceeded { .. } => false,
+            | Self::RequestBodySizeExceeded { .. }
+            | Self::ChunkTimeout => false,
         }
     }
 
@@ -156,7 +160,8 @@ impl ApiError {
             | Self::Json { .. }
             | Self::InvalidSseFrame(_)
             | Self::BackoffOverflow { .. }
-            | Self::RequestBodySizeExceeded { .. } => None,
+            | Self::RequestBodySizeExceeded { .. }
+            | Self::ChunkTimeout => None,
         }
     }
 
@@ -177,7 +182,8 @@ impl ApiError {
             Self::Api { status, .. } if status.as_u16() == 429 => "provider_rate_limit",
             Self::Api { .. } if self.is_generic_fatal_wrapper() => "provider_internal",
             Self::Api { .. } => "provider_error",
-            Self::Http(_) | Self::InvalidSseFrame(_) | Self::BackoffOverflow { .. } => {
+            Self::Http(_) | Self::InvalidSseFrame(_) | Self::BackoffOverflow { .. }
+            | Self::ChunkTimeout => {
                 "provider_transport"
             }
             Self::InvalidApiKeyEnv(_) | Self::Io(_) | Self::Json { .. } => "runtime_io",
@@ -205,7 +211,8 @@ impl ApiError {
             | Self::Json { .. }
             | Self::InvalidSseFrame(_)
             | Self::BackoffOverflow { .. }
-            | Self::RequestBodySizeExceeded { .. } => false,
+            | Self::RequestBodySizeExceeded { .. }
+            | Self::ChunkTimeout => false,
         }
     }
 
@@ -235,7 +242,8 @@ impl ApiError {
             | Self::Json { .. }
             | Self::InvalidSseFrame(_)
             | Self::BackoffOverflow { .. }
-            | Self::RequestBodySizeExceeded { .. } => false,
+            | Self::RequestBodySizeExceeded { .. }
+            | Self::ChunkTimeout => false,
         }
     }
 }
@@ -344,6 +352,10 @@ impl Display for ApiError {
             } => write!(
                 f,
                 "request body size ({estimated_bytes} bytes) exceeds {provider} limit ({max_bytes} bytes); reduce prompt length or context before retrying"
+            ),
+            Self::ChunkTimeout => write!(
+                f,
+                "provider stream stalled: no chunk received within deadline"
             ),
         }
     }
