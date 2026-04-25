@@ -3,6 +3,7 @@ pub mod xml_plan;
 pub mod sizing;
 pub mod profile;
 pub mod escalate;
+pub mod classify;
 
 use std::path::Path;
 use crate::planner::profile::ProfileId;

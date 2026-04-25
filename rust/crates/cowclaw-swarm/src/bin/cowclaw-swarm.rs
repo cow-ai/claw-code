@@ -41,9 +41,37 @@ async fn main() {
                 std::process::exit(1);
             }
         }
+    } else if args.iter().any(|a| a == "--classify-only") {
+        let objective = args
+            .iter()
+            .position(|a| a == "--objective")
+            .and_then(|i| args.get(i + 1))
+            .map_or("", String::as_str);
+
+        let files_str = args
+            .iter()
+            .position(|a| a == "--files")
+            .and_then(|i| args.get(i + 1))
+            .map_or("", String::as_str);
+
+        let files: Vec<&str> = if files_str.is_empty() {
+            vec![]
+        } else {
+            files_str.split(',').collect()
+        };
+
+        let result = cowclaw_swarm::planner::classify::classify(objective, &files);
+        match serde_json::to_string_pretty(&result) {
+            Ok(json) => println!("{json}"),
+            Err(e) => {
+                eprintln!("[cowclaw-swarm] JSON serialization error: {e}");
+                std::process::exit(1);
+            }
+        }
     } else {
         eprintln!("Usage: cowclaw-swarm --mcp-stdio [--root <dir>] [--db <path>]");
         eprintln!("       cowclaw-swarm --dump-planning-graph [--root <dir>]");
+        eprintln!("       cowclaw-swarm --classify-only --objective <text> [--files <comma-separated-paths>]");
         std::process::exit(1);
     }
 }
